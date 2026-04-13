@@ -18,19 +18,7 @@ Vector::Vector(const ValueType* rawArray, const size_t size, float coef) {
 }
 
 Vector::Vector(const Vector& other) {
-	_size = other._size;
-	_capacity = _size;
-	_multiplicativeCoef = other._multiplicativeCoef;
-
-    	if (_size > 0) {
-		_data = new ValueType[_size];
-        	for (size_t i = 0; i < _size; ++i) {
-            		_data[i] = other._data[i];
-        	}
-    	}
-  	else {
-        	_data = nullptr;
-	}
+	*this = other;
 }
 
 Vector& Vector::operator=(const Vector& other) {
@@ -55,14 +43,7 @@ Vector& Vector::operator=(const Vector& other) {
 }
 
 Vector::Vector(Vector&& other) noexcept {
-	_data = other._data;
-    	_size = other._size;
-    	_capacity = other._capacity;
-    	_multiplicativeCoef = other._multiplicativeCoef;
-
-    	other._data = nullptr;
-    	other._size = 0;
-    	other._capacity = 0;
+	*this = std::move(other);
 }
 
 Vector& Vector::operator=(Vector&& other) noexcept {
