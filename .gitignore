@@ -1,0 +1,3 @@
+*.o
+vector_test
+libVectorTest.a
