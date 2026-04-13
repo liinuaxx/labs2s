@@ -1,4 +1,5 @@
 #include "Vector.h"
+#include <stdexcept>
 
 Vector::Vector(const ValueType* rawArray, const size_t size, float coef) {
 	_size = size;
@@ -87,7 +88,7 @@ Vector::~Vector()
 
 void Vector::pushBack(const ValueType& value) {
 	if (_size == _capacity) {
-		size_t newCapacity = (_capacity == 0) ? 1 : (size_t)(_capacity * _multiplicativeCoef);
+		size_t newCapacity = (_capacity == 0) ? (size_t)_multiplicativeCoef : (size_t)(_capacity * _multiplicativeCoef);
 		
 		ValueType* newData = new ValueType[newCapacity];
 		for (size_t i = 0; i < _size; ++i) {
@@ -103,7 +104,7 @@ void Vector::pushBack(const ValueType& value) {
 
 void Vector::pushFront(const ValueType& value) {
 	if (_size == _capacity) {
-        	size_t newCapacity = (_capacity == 0) ? 1 : (size_t)(_capacity * _multiplicativeCoef);
+        	size_t newCapacity = (_capacity == 0) ? (size_t)_multiplicativeCoef : (size_t)(_capacity * _multiplicativeCoef);
         	ValueType* newData = new ValueType[newCapacity];
 		
 		for (size_t i = 0; i < _size; ++i) {
@@ -130,7 +131,7 @@ void Vector::insert(const ValueType& value, size_t pos) {
     	}
 
     	if (_size == _capacity) {
-        	size_t newCapacity = (_capacity == 0) ? 1 : (size_t)(_capacity * _multiplicativeCoef);
+        	size_t newCapacity = (_capacity == 0) ? (size_t)_multiplicativeCoef : (size_t)(_capacity * _multiplicativeCoef);
         	ValueType* newData = new ValueType[newCapacity];
 
         	for (size_t i = 0; i < pos; ++i) {
@@ -199,14 +200,15 @@ void Vector::insert(const Vector& vector, size_t pos) {
 }
 
 void Vector::popBack() {
-	if (_size > 0) {
-		_size--;
-    	}
+	if (_size == 0) {
+		throw std::out_of_range("Vector is empty");
+	}
+	_size--;
 }
 
 void Vector::popFront() {
 	if (_size == 0) {
-        	return;
+		throw std::out_of_range("Vector is empty");
     	}
 	
 	for (size_t i = 0; i < _size - 1; ++i) {
