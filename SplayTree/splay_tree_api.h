@@ -81,8 +81,7 @@ public:
     }
     
     bool isValidBST() const {
-        if (!root) return true;
-        return validateBST(root, Key(), Key());
+        return validateBST(root, nullptr, nullptr);
     }
     
     size_t size() const { return treeSize; }
@@ -192,10 +191,10 @@ private:
         delete node;
     }
     
-    bool validateBST(Node* node, const Key& minKey, const Key& maxKey) const {
+    bool validateBST(const Node* node, const Key* minKey, const Key* maxKey) const {
         if (!node) return true;
-        if (node->key <= minKey || node->key >= maxKey) return false;
-        return validateBST(node->left, minKey, node->key) && 
-               validateBST(node->right, node->key, maxKey);
+        if (minKey && node->key <= *minKey) return false;
+        if (maxKey && node->key >= *maxKey) return false;
+        return validateBST(node->left, minKey, &node->key) && validateBST(node->right, &node->key, maxKey);
     }
 };
