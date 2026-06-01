@@ -1,209 +1,134 @@
 #include "min_circle.h"
 #include <vector>
 #include <cmath>
-#include <limits>
 #include <algorithm>
-#include <random>
 
-bool Point2D::operator==(const Point2D& other) const
-{
-    if (x == other.x && y == other.y)
-    {
-        return true;
-    }
-    return false;
+constexpr double EPS = 1e-8;
+
+bool Point2D::operator==(const Point2D& other) const {
+    return std::abs(x - other.x) < EPS && std::abs(y - other.y) < EPS;
 }
-bool Point2D::operator!=(const Point2D& other) const 
-{
+
+bool Point2D::operator!=(const Point2D& other) const {
     return !(*this == other);
 }
-bool Circle::isValid() const 
-{
-    return radius >= 0;
+
+bool Circle::isValid() const {
+    return radius >= -EPS;
 }
-bool Circle::contains(const Point2D& point) const 
-{
-    if (distance(center, point) <= radius)
-    {
-        return true;
-    }
-    return false;
+
+bool Circle::contains(const Point2D& point) const {
+    return distance(center, point) <= radius + EPS;
 }
+
 bool Circle::contains(const LineSegment& segment) const {
-    if (distance(segment.start, center) <= radius && distance(segment.end, center) <= radius)
-    {
-        return true;
-    }
-    return false;
+    return contains(segment.start) && contains(segment.end);
 }
-bool Circle::containsEntireSegment(const LineSegment& segment) const 
-{
+
+bool Circle::containsEntireSegment(const LineSegment& segment) const {
     Point2D mid = findMidPoint(segment);
-    if (distance(segment.start, center) <= radius && distance(segment.end, center) <= radius && distance(mid, center) <= radius)
-    {
-        return true;
-    }
-    return false;
+    return contains(segment.start) && contains(segment.end) && contains(mid);
 }
 
 Circle MinimumEnclosingCircleForSegments(const std::vector<LineSegment>& segments) {
-    if (segments.empty())
-    {
-        return { {0, 0}, -1.0 };
-    }
+    if (segments.empty()) return {{0, 0}, -1.0};
 
     std::vector<Point2D> points = extractPointsFromSegments(segments);
-
     Circle res = minCircle(points);
 
     for (const auto& seg : segments) {
-        if (!res.containsEntireSegment(seg)) 
-        {
-            Point2D farthestPoint;
+        if (!res.containsEntireSegment(seg)) {
+            Point2D farthestPoint = seg.start;
             double maxDist = 0;
             Point2D mid = findMidPoint(seg);
-            if (distance(res.center, seg.start) > maxDist) 
-            {
-                maxDist = distance(res.center, seg.start);
-                farthestPoint = seg.start;
-            }
-            if (distance(res.center, seg.end) > maxDist)
-            {
-                maxDist = distance(res.center, seg.end);
-                farthestPoint = seg.end;
-            }
-            if (distance(res.center, mid) > maxDist) 
-            {
-                maxDist = distance(res.center, mid);
-                farthestPoint = mid;
-            }
+            
+            double d1 = distance(res.center, seg.start);
+            if (d1 > maxDist) { maxDist = d1; farthestPoint = seg.start; }
+            
+            double d2 = distance(res.center, seg.end);
+            if (d2 > maxDist) { maxDist = d2; farthestPoint = seg.end; }
+            
+            double d3 = distance(res.center, mid);
+            if (d3 > maxDist) { maxDist = d3; farthestPoint = mid; }
 
             res = circleFromDiameter(res.center, farthestPoint);
         }
     }
-
     return res;
 }
-double distanceSquared(const Point2D& p1, const Point2D& p2)
-{
+
+double distanceSquared(const Point2D& p1, const Point2D& p2) {
     double dx = p1.x - p2.x;
     double dy = p1.y - p2.y;
     return dx * dx + dy * dy;
 }
-double distance(const Point2D& p1, const Point2D& p2)
-{
+
+double distance(const Point2D& p1, const Point2D& p2) {
     return std::sqrt(distanceSquared(p1, p2));
 }
-Circle circleFromDiameter(const Point2D& p1, const Point2D& p2)
-{
-    LineSegment segment;
-    segment.start = p1;
-    segment.end = p2;
-    Point2D mid = findMidPoint(segment);
-    Circle res;
-    res.center = mid;
-    res.radius = distance(mid, p1);
-    return res;
+
+Circle circleFromDiameter(const Point2D& p1, const Point2D& p2) {
+    Point2D mid{(p1.x + p2.x) / 2, (p1.y + p2.y) / 2};
+    return {mid, distance(mid, p1)};
 }
-Circle circleFrom3Points(const Point2D& p1, const Point2D& p2, const Point2D& p3)
-{
-    Circle res;
+
+Circle circleFrom3Points(const Point2D& p1, const Point2D& p2, const Point2D& p3) {
     double d = 2 * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
-    if (std::abs(d) < 1e-9) 
-    {
+    if (std::abs(d) < EPS) {
         double d12 = distanceSquared(p1, p2);
         double d23 = distanceSquared(p2, p3);
         double d31 = distanceSquared(p3, p1);
-
-        if (d12 >= d23 && d12 >= d31)
-            return circleFromDiameter(p1, p2);
-        else if (d23 >= d12 && d23 >= d31)
-            return circleFromDiameter(p2, p3);
-        else
-            return circleFromDiameter(p3, p1);
+        if (d12 >= d23 && d12 >= d31) return circleFromDiameter(p1, p2);
+        if (d23 >= d12 && d23 >= d31) return circleFromDiameter(p2, p3);
+        return circleFromDiameter(p3, p1);
     }
 
-    double centerx = ((p1.x * p1.x + p1.y * p1.y) * (p2.y - p3.y) +
-        (p2.x * p2.x + p2.y * p2.y) * (p3.y - p1.y) +
-        (p3.x * p3.x + p3.y * p3.y) * (p1.y - p2.y)) / d;
+    double centerx = ((p1.x*p1.x + p1.y*p1.y) * (p2.y - p3.y) +
+                      (p2.x*p2.x + p2.y*p2.y) * (p3.y - p1.y) +
+                      (p3.x*p3.x + p3.y*p3.y) * (p1.y - p2.y)) / d;
 
-    double centery = ((p1.x * p1.x + p1.y * p1.y) * (p3.x - p2.x) +
-        (p2.x * p2.x + p2.y * p2.y) * (p1.x - p3.x) +
-        (p3.x * p3.x + p3.y * p3.y) * (p2.x - p1.x)) / d;
+    double centery = ((p1.x*p1.x + p1.y*p1.y) * (p3.x - p2.x) +
+                      (p2.x*p2.x + p2.y*p2.y) * (p1.x - p3.x) +
+                      (p3.x*p3.x + p3.y*p3.y) * (p2.x - p1.x)) / d;
 
-    res.center = {centerx, centery};
-    res.radius = distance(res.center, p1);
-    return res;
+    Point2D center{centerx, centery};
+    return {center, distance(center, p1)};
 }
 
-Circle minCircleHelper(std::vector<Point2D>& points, std::vector<Point2D> boundary, size_t n)
-{
-    if (n == 0 || boundary.size() == 3)
-    {
-        if (boundary.empty())
-        {
-            return { {0,0}, -1.0 };
-        }
-        else if (boundary.size() == 1)
-        {
-            return { boundary[0], 0.0 };
-        }
-        else if (boundary.size() == 2)
-        {
-            return circleFromDiameter(boundary[0], boundary[1]);
-        }
-        else
-        {
-            return circleFrom3Points(boundary[0], boundary[1], boundary[2]);
+Circle minCircle(std::vector<Point2D> points) {
+    if (points.empty()) return {{0, 0}, -1.0};
+    
+    Circle c; c.center = points[0]; c.radius = 0.0;
+
+    for (size_t i = 1; i < points.size(); ++i) {
+        if (!c.contains(points[i])) {
+            c.center = points[i]; c.radius = 0.0;
+            for (size_t j = 0; j < i; ++j) {
+                if (!c.contains(points[j])) {
+                    c = circleFromDiameter(points[i], points[j]);
+                    for (size_t k = 0; k < j; ++k) {
+                        if (!c.contains(points[k])) {
+                            c = circleFrom3Points(points[i], points[j], points[k]);
+                        }
+                    }
+                }
+            }
         }
     }
-
-    size_t idx = rand() % n;
-    Point2D p = points[idx];
-
-    std::swap(points[idx], points[n - 1]);
-
-    Circle res = minCircleHelper(points, boundary, n - 1);
-
-    if (res.isValid() && res.contains(p))
-        return res;
-
-    boundary.push_back(p);
-    return minCircleHelper(points, boundary, n - 1);
-
+    return c;
 }
 
-Circle minCircle(std::vector<Point2D> points)
-{
-    if (points.empty())
-    {
-        return { {0, 0}, -1.0 };
-    }
-
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(points.begin(), points.end(), g);
-
-    return minCircleHelper(points, {}, points.size());
-}
-std::vector<Point2D> extractPointsFromSegments(const std::vector<LineSegment>& segments)
-{
+std::vector<Point2D> extractPointsFromSegments(const std::vector<LineSegment>& segments) {
     std::vector<Point2D> res;
-    res.reserve(segments.size() * 3);  
-
-    for (const auto& seg : segments)
-    {
+    res.reserve(segments.size() * 3);
+    for (const auto& seg : segments) {
         res.push_back(seg.start);
         res.push_back(findMidPoint(seg));
         res.push_back(seg.end);
     }
-
     return res;
 }
-Point2D findMidPoint(const LineSegment& segment)
-{
-    Point2D mid;
-    mid.x = (segment.start.x + segment.end.x) / 2;
-    mid.y = (segment.start.y + segment.end.y) / 2;
-    return mid;
+
+Point2D findMidPoint(const LineSegment& segment) {
+    return {(segment.start.x + segment.end.x) / 2, (segment.start.y + segment.end.y) / 2};
 }
