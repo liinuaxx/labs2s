@@ -1,99 +1,127 @@
 #include <iostream>
-#include <stack>
 #include <string>
+#include <stack>
 #include <sstream>
+#include <cmath>
 
-// Проверяет, является ли строка целым числом (в том числе отрицательным)
-bool isNumericToken(const std::string& token) {
-    if (token.length() == 0)
-	    return false;
-    size_t i = 0;
-    if (token[0] == '-') {
-        if (token.length() == 1) 
-		return false;
-        ++i;
-    }
-    for (; i < token.length(); i++) {
-        if (!std::isdigit(token[i]))
-	       	return false;
-    }
-    return true;
+bool isDigit(char c) {
+    return c >= '0' && c <= '9';
 }
-
-// Проверяет, является ли строка бинарным оператором (+, -, *, /, %)
-bool isBinaryOperator(const std::string& token) {
-    return (token == "+") || (token == "-") || (token == "*") || (token == "/") || (token == "%");
+bool isOp(char c) {
+    return c == '+' || c == '-' || c == '*' || c == '/' || c == '^';
 }
-
-// Возвращает приоритет оператора: для + и - приоритет 0, для *, /, % — 1
-int getOperatorPrecedence(const std::string& op) {
-    if (op == "+" || op == "-")
-	    return 0;
+int prec(char op) {
+    if (op == '^') return 3;
+    if (op == '*' || op == '/') return 2;
     return 1;
 }
-
-int main() {
-    std::string inputLine;
-    std::cout<<"Введите выражение:\n";
-    std::getline(std::cin, inputLine);
-    std::istringstream tokenStream(inputLine);
-
-    std::stack<std::string> operatorStack;   // стек для операторов и скобок
-    std::string currentToken;
-
-    while (tokenStream >> currentToken) {
-        // Если токен — число, отправляем его сразу на выход
-        if (isNumericToken(currentToken)) {
-            std::cout << currentToken << ' ';
-            continue;
-        }
-
-        // Если токен — оператор
-        if (isBinaryOperator(currentToken)) {
-            // Пока на стеке есть оператор с бoльшим или равным приоритетом, выталкиваем его
-            while (!operatorStack.empty() && isBinaryOperator(operatorStack.top()) &&
-                   getOperatorPrecedence(operatorStack.top()) >= getOperatorPrecedence(currentToken)) {
-                std::cout << operatorStack.top() << ' ';
-                operatorStack.pop();
+bool leftAssoc(char op) {
+    return op != '^';
+}
+std::string shuntingYard(const std::string& expr) {
+    std::string out;
+    std::stack<char> st;
+    bool needNum = true;
+    for (size_t i = 0; i < expr.length(); ++i) {
+        char c = expr[i];
+        if (c == ' ') continue;
+        if (isDigit(c) || c == '.') {
+            std::string num;
+            while (i < expr.length() && (isDigit(expr[i]) || expr[i] == '.')) {
+                num += expr[i];
+                ++i;
             }
-            operatorStack.push(currentToken);
+            --i;
+            out += num + " ";
+            needNum = false;
             continue;
         }
-
-        // Если токен — открывающая скобка, кладём её в стек
-        if (currentToken == "(") {
-            operatorStack.push(currentToken);
+        if ((c == '+' || c == '-') && needNum) {
+            if (c == '-') out += "~ ";
             continue;
         }
-
-        // Если токен — закрывающая скобка, выталкиваем все операторы до соответствующей "("
-        if (currentToken == ")") {
-            if (operatorStack.empty()) {
-                throw std::runtime_error("Пропущена скобка");
-            }
-            while (operatorStack.top() != "(") {
-                std::cout << operatorStack.top() << ' ';
-                operatorStack.pop();
-                if (operatorStack.empty()) {
-                    throw std::runtime_error("Пропущена скобка");
+        if (isOp(c)) {
+            while (!st.empty() && st.top() != '(' && isOp(st.top())) {
+                if ((leftAssoc(c) && prec(st.top()) >= prec(c)) ||
+                    (!leftAssoc(c) && prec(st.top()) > prec(c))) {
+                    out += st.top();
+                    out += " ";
+                    st.pop();
+                } else {
+                    break;
                 }
             }
-            operatorStack.pop();   // удаляем саму "("
+            st.push(c);
+            needNum = true;
             continue;
         }
-
-        // Если ни одно из условий не подошло — неизвестный токен
-        throw std::runtime_error("Неизвестный токен");
-    }
-
-    // После обработки всех токенов выталкиваем оставшиеся операторы из стека
-    while (!operatorStack.empty()) {
-        if (operatorStack.top() == "(") {
-            throw std::runtime_error("Пропущена скобка");
+        if (c == '(') {
+            st.push('(');
+            needNum = true;
+            continue;
         }
-        std::cout << operatorStack.top() << ' ';
-        operatorStack.pop();
+        if (c == ')') {
+            while (!st.empty() && st.top() != '(') {
+                out += st.top();
+                out += " ";
+                st.pop();
+            }
+            if (st.empty()) throw std::runtime_error("неверные скобки");
+            st.pop();
+            needNum = false;
+            continue;
+        }
+        throw std::invalid_argument("неизвестный символ");
     }
-
-    std::cout << std::endl;
+    while (!st.empty()) {
+        if (st.top() == '(') throw std::runtime_error("неверные скобки");
+        out += st.top();
+        out += " ";
+        st.pop();
+    }
+    if (!out.empty() && out.back() == ' ') out.pop_back();
+    return out;
+}
+double evalRPN(const std::string& rpn) {
+    std::stack<double> st;
+    std::istringstream iss(rpn);
+    std::string tok;
+    while (iss >> tok) {
+        if (tok == "~") {
+            if (st.empty()) throw std::runtime_error("ошибка вычисления");
+            double v = st.top(); st.pop();
+            st.push(-v);
+            continue;
+        }
+        if (tok.size() == 1 && isOp(tok[0])) {
+            if (st.size() < 2) throw std::runtime_error("ошибка вычисления");
+            double b = st.top(); st.pop();
+            double a = st.top(); st.pop();
+            char op = tok[0];
+            if (op == '+') st.push(a + b);
+            else if (op == '-') st.push(a - b);
+            else if (op == '*') st.push(a * b);
+            else if (op == '/') {
+                if (b == 0) throw std::runtime_error("деление на ноль");
+                st.push(a / b);
+            } else st.push(std::pow(a, b));
+            continue;
+        }
+        st.push(std::stod(tok));
+    }
+    if (st.size() != 1) throw std::runtime_error("ошибка вычисления");
+    return st.top();
+}
+int main() {
+    std::cout << "Введите выражение: ";
+    std::string line;
+    std::getline(std::cin, line);
+    try {
+        std::string rpn = shuntingYard(line);
+        std::cout << "RPN: " << rpn << "\n";
+        std::cout << "Результат: " << evalRPN(rpn) << "\n";
+    } catch (const std::exception& e) {
+        std::cerr << "Ошибка: " << e.what() << "\n";
+    }
+    return 0;
 }
